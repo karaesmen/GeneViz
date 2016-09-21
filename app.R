@@ -4,6 +4,8 @@ library(Gviz)
 setwd("~/Desktop/OSU_PHD/Candidate_gene/gene_viz/")
 
 x <- fread("./data/FULL_table.txt",  header="auto", sep="auto")
+
+
 setkey(x, gene)
 genes <- data.frame(unique(x)[,"gene",with=F])
 x[, c("Pvalue.log10") := -log10(x[,"Pvalue", with = F])]
@@ -87,6 +89,23 @@ plotData <- function(gene, disease, genome, cohort, outcome){
 }
 
 
+
+summaryData <- function(my.gene, my.disease, my.genome, my.cohort, my.outcome, result=c("gene.based", "topsnp", "toppval")){
+        p <- x[gene==my.gene & disease==my.disease & genome==my.genome & cohort==my.cohort & outcome==my.outcome,]
+        p <- unique(data.frame(p[,list(gene, geneBasedPvalue, topSNP, topSNPpVal)]))
+        if(result=="gene.based"){
+                paste0("Gene based p-value: ", round(p$geneBasedPvalue, 10))
+        }
+        else if(result=="topsnp"){
+                paste0("Top SNP: ", p$topSNP)
+                
+        } else{
+                paste0("Top SNP p-value: ", round(p$topSNPpVal, 10))
+                
+        }
+}
+
+
 ui <- fluidPage(
         titlePanel("DISCoVERY-BMT Replication of Candidate Gene Studies"),
         sidebarPanel(
@@ -98,14 +117,28 @@ ui <- fluidPage(
                 actionButton("plotbutton", "Show plot")
         ),
         mainPanel(
-                plotOutput("gviz", width="100%")
+                tabsetPanel(
+                        tabPanel("Plot", plotOutput("gviz", width="100%", height="1000px")),
+                        tabPanel("Summary", htmlOutput("gene_name"))
+                )
+                
         )
-        
 )       
 
 server <- function(input, output){
+        output$gene_name <- renderUI({
+                header <- shiny::tags$h1(paste0(input$gene, " gene-based results for ",  input$disease, " (", input$cohort, "/", input$outcome, ")")) 
+                gene.symbol <- paste0("Gene Symbol: ", input$gene)
+                full.name <- paste0("Gene Name: ", mapIds(org.Hs.eg.db, toupper(gene),"GENENAME", "SYMBOL"))
+                gene.based <- summaryData(input$gene, input$disease, input$genome, input$cohort, input$outcome, "gene.based")
+                topsnp <- summaryData(input$gene, input$disease, input$genome, input$cohort, input$outcome, "topsnp")
+                topsnp.pval <- summaryData(input$gene, input$disease, input$genome, input$cohort, input$outcome, "toppval")
+                HTML(paste(header, gene.symbol, full.name, gene.based, topsnp, topsnp.pval, sep='<br/>'))
+        })
+        
         output$gviz <- renderPlot({
-                plotData(input$gene, input$disease, input$genome, input$cohort, input$outcome)
+                input$plotbutton
+                isolate(plotData(input$gene, input$disease, input$genome, input$cohort, input$outcome))
         })
         
 }
