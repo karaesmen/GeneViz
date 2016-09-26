@@ -4,32 +4,26 @@ library(Gviz)
 setwd("~/Desktop/OSU_PHD/Candidate_gene/gene_viz/")
 
 x <- fread("./data/FULL_table.txt",  header="auto", sep="auto")
-
-
 setkey(x, gene)
 genes <- data.frame(unique(x)[,"gene",with=F])
 x[, c("Pvalue.log10") := -log10(x[,"Pvalue", with = F])]
-
 xx <- dcast(x, gene + rsID + chr + BP + impute + disease + genome + outcome + geneBasedPvalue + topSNP + topSNPpVal + BPfromtopSNP  
             ~ cohort, value.var="Pvalue")
-
 setorder(xx, gene, BP)
 
 ## Generate the GRanges object
 test <- DataFrame(xx)
 test[["end"]] <- test[["BP"]] +1
-
-
 gr <- makeGRangesFromDataFrame(test, ignore.strand = T, seqnames.field = "chr", 
                                start.field = "BP", end.field = "end", starts.in.df.are.0based = T, keep.extra.columns = T) # is it 0based??
 
 
-plotData <- function(gene, disease, genome, cohort, outcome){
+plotData <- function(my.gene, my.disease, my.genome, my.cohort, my.outcome){
         
-        gr.viz <- gr[c(gr$gene == gene & gr$disease == disease & gr$genome == genome), ]
+        gr.viz <- gr[c(gr$gene == my.gene & gr$disease == my.disease & gr$genome == my.genome), ]
         
         gene_loc <- read.table("./data/gene_locations.txt", stringsAsFactors = F, header = T)
-        my.gene.range = gene_loc[gene_loc$gene_symbol == gene, c("start_position", "end_position")]
+        my.gene.range = gene_loc[gene_loc$gene_symbol == my.gene, c("start_position", "end_position")]
         my.chr <- unique(as.character(seqnames(gr.viz)))
         
         getOption("Gviz.scheme")
@@ -43,16 +37,16 @@ plotData <- function(gene, disease, genome, cohort, outcome){
         
         bgr.col <-  c('#a6cee3','#1f78b4','#b2df8a','#33a02c')
         
-        dTrack.DD <- DataTrack( gr.viz[gr.viz$outcome == "DD", cohort], 
+        dTrack.DD <- DataTrack( gr.viz[gr.viz$outcome == "DD", my.cohort], 
                                 name="DD (-log10)",  background.title=bgr.col[1], col.frame=bgr.col[1]) 
         
-        dTrack.OS <- DataTrack( gr.viz[gr.viz$outcome == "OS", cohort], 
+        dTrack.OS <- DataTrack( gr.viz[gr.viz$outcome == "OS", my.cohort], 
                                 name="OS (-log10)", background.title=bgr.col[2]) 
         
-        dTrack.PFS <- DataTrack( gr.viz[gr.viz$outcome == "PFS", cohort], 
+        dTrack.PFS <- DataTrack( gr.viz[gr.viz$outcome == "PFS", my.cohort], 
                                  name="PFS (-log10)", background.title=bgr.col[3]) 
         
-        dTrack.TRM <- DataTrack( gr.viz[gr.viz$outcome == "TRM", cohort], 
+        dTrack.TRM <- DataTrack( gr.viz[gr.viz$outcome == "TRM", my.cohort], 
                                  name="TRM (-log10)", background.title=bgr.col[4]) 
         
         
@@ -76,9 +70,9 @@ plotData <- function(gene, disease, genome, cohort, outcome){
         cohort.cols <- c('#66c2a5','#fc8d62','#8da0cb')
         
         
-        plotTracks(myTracks[c("itrack", "gtrack", "biomTrack", outcome)], 
+        plotTracks(myTracks[c("itrack", "gtrack", "biomTrack", my.outcome)], 
                    type=c( "p"), legend=T, cex=0.9, col.line = "gray", col= NULL,
-                   groups = cohort, col.symbol = cohort.cols,
+                   groups = my.cohort, col.symbol = cohort.cols,
                    transcriptAnnotation="symbol", stackHeight = 0.7, 
                    fontsize=16, collapseTranscripts = "meta",
                    baseline=c(0:8, -log10(5e-5), -log10(5e-8)),
@@ -106,42 +100,91 @@ summaryData <- function(my.gene, my.disease, my.genome, my.cohort, my.outcome, r
 }
 
 
-ui <- fluidPage(
-        titlePanel("DISCoVERY-BMT Replication of Candidate Gene Studies"),
+summary.res <- function(my.gene, my.disease, my.genome, my.cohort, my.outcome){
+        header <- shiny::tags$h1(paste0(my.gene, " gene-based results for ",  my.disease, " (", my.cohort, "/", my.outcome, ")")) 
+        gene.symbol <- paste0("Gene Symbol: ", my.gene)
+        full.name <- paste0("Gene Name: ", mapIds(org.Hs.eg.db, toupper(my.gene),"GENENAME", "SYMBOL"))
+        gene.based <- summaryData(my.gene, my.disease, my.genome, my.cohort, my.outcome, "gene.based")
+        topsnp <- summaryData(my.gene, my.disease, my.genome, my.cohort, my.outcome, "topsnp")
+        topsnp.pval <- summaryData(my.gene, my.disease, my.genome, my.cohort, my.outcome, "toppval")
+        HTML(paste(header, gene.symbol, full.name, gene.based, topsnp, topsnp.pval, sep='<br/>'))
+}
+
+ui <- shinyUI(pageWithSidebar(
+        headerPanel("DISCOVeRY-BMT Replication of Candidate Gene Studies"),
         sidebarPanel(
-                selectInput(inputId = "gene", label = "Select gene:", choices=genes),
-                selectInput(inputId = "disease", label = "Select disease:", choices=c("ALLonly", "AMLonly", "mixed", "noALL")),
-                selectInput(inputId = "genome", label = "Select genome:", choices=c("D", "R", "S")),
-                checkboxGroupInput(inputId="outcome", label="Select survival outcomes:", choices=c("DD", "PFS", "OS", "TRM")),
-                checkboxGroupInput(inputId="cohort", label="Select cohort:", choices=c("c1", "c2", "M")),
-                actionButton("plotbutton", "Show plot")
-        ),
+                conditionalPanel(condition="input.conditionedPanels==1",
+                                 selectInput(inputId = "gene",
+                                             label = "Select gene:",
+                                             choices=genes),
+                                 selectInput(inputId = "disease",
+                                             label = "Select disease:",
+                                             choices=c("ALLonly", "AMLonly", "mixed", "noALL")),
+                                 selectInput(inputId = "genome",
+                                             label = "Select genome:",
+                                             choices=c("D", "R", "S")),
+                                 checkboxGroupInput(inputId="outcome",
+                                                    label="Select survival outcomes:",
+                                                    choices=c("DD", "PFS", "OS", "TRM")),
+                                 checkboxGroupInput(inputId="cohort",
+                                                    label="Select cohort:",
+                                                    choices=c("c1", "c2", "M")),
+                                 actionButton("plotbutton", "Show Plot")
+                ),
+                conditionalPanel(condition="input.conditionedPanels==2",
+                                 selectInput(inputId = "gene2",
+                                             label = "Select gene:",
+                                             choices=genes),
+                                 selectInput(inputId = "disease2",
+                                             label = "Select disease:",
+                                             choices=c("ALLonly", "AMLonly", "mixed", "noALL")),
+                                 selectInput(inputId = "genome2",
+                                             label = "Select genome:",
+                                             choices=c("D", "R", "S")),
+                                 checkboxGroupInput(inputId="outcome2",
+                                                    label="Select survival outcomes:",
+                                                    choices=c("DD", "PFS", "OS", "TRM")),
+                                 checkboxGroupInput(inputId="cohort2",
+                                                    label="Select cohort:",
+                                                    choices=c("c1", "c2", "M")),
+                                 actionButton("summarybutton", "Generate Summary")
+                )
+),
         mainPanel(
                 tabsetPanel(
-                        tabPanel("Plot", plotOutput("gviz", width="100%", height="1000px")),
-                        tabPanel("Summary", htmlOutput("gene_name"))
+                        id = "conditionedPanels",
+                        tabPanel("Plot",
+                                 uiOutput("ui_plot"),
+                                 value=1),
+                        tabPanel("Summary",
+                                 htmlOutput("gene_info"),
+                                 value=2)
                 )
-                
         )
-)       
+))       
 
 server <- function(input, output){
-        output$gene_name <- renderUI({
-                header <- shiny::tags$h1(paste0(input$gene, " gene-based results for ",  input$disease, " (", input$cohort, "/", input$outcome, ")")) 
-                gene.symbol <- paste0("Gene Symbol: ", input$gene)
-                full.name <- paste0("Gene Name: ", mapIds(org.Hs.eg.db, toupper(gene),"GENENAME", "SYMBOL"))
-                gene.based <- summaryData(input$gene, input$disease, input$genome, input$cohort, input$outcome, "gene.based")
-                topsnp <- summaryData(input$gene, input$disease, input$genome, input$cohort, input$outcome, "topsnp")
-                topsnp.pval <- summaryData(input$gene, input$disease, input$genome, input$cohort, input$outcome, "toppval")
-                HTML(paste(header, gene.symbol, full.name, gene.based, topsnp, topsnp.pval, sep='<br/>'))
-        })
+        plot_height <- function(){
+                ceiling((length(input$outcome)/2.5)*1000)
+        }
         
         output$gviz <- renderPlot({
                 input$plotbutton
                 isolate(plotData(input$gene, input$disease, input$genome, input$cohort, input$outcome))
+        }) 
+        
+        output$ui_plot <- renderUI({
+                input$plotbutton
+                isolate(plotOutput("gviz", height=plot_height(), width="100%"))
+        })
+
+        
+        output$gene_info <- renderUI({
+                input$summarybutton
+                isolate(summary.res(input$gene2, input$disease2, input$genome2, input$cohort2, input$outcome2))
         })
         
+        
 }
-
 
 shinyApp(ui = ui, server = server)

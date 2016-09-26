@@ -1,9 +1,9 @@
-plotData <- function(gene, disease, genome, cohort, outcome){
+plotData <- function(my.gene, my.disease, my.genome, my.cohort, my.outcome){
         
-        gr.viz <- gr[c(gr$gene == gene & gr$disease == disease & gr$genome == genome), ]
+        gr.viz <- gr[c(gr$gene == my.gene & gr$disease == my.disease & gr$genome == my.genome), ]
         
         gene_loc <- read.table("./data/gene_locations.txt", stringsAsFactors = F, header = T)
-        my.gene.range = gene_loc[gene_loc$gene_symbol == gene, c("start_position", "end_position")]
+        my.gene.range = gene_loc[gene_loc$gene_symbol == my.gene, c("start_position", "end_position")]
         my.chr <- unique(as.character(seqnames(gr.viz)))
         
         getOption("Gviz.scheme")
@@ -17,16 +17,16 @@ plotData <- function(gene, disease, genome, cohort, outcome){
         
         bgr.col <-  c('#a6cee3','#1f78b4','#b2df8a','#33a02c')
         
-        dTrack.DD <- DataTrack( gr.viz[gr.viz$outcome == "DD", cohort], 
+        dTrack.DD <- DataTrack( gr.viz[gr.viz$outcome == "DD", my.cohort], 
                                 name="DD (-log10)",  background.title=bgr.col[1], col.frame=bgr.col[1]) 
         
-        dTrack.OS <- DataTrack( gr.viz[gr.viz$outcome == "OS", cohort], 
+        dTrack.OS <- DataTrack( gr.viz[gr.viz$outcome == "OS", my.cohort], 
                                 name="OS (-log10)", background.title=bgr.col[2]) 
         
-        dTrack.PFS <- DataTrack( gr.viz[gr.viz$outcome == "PFS", cohort], 
+        dTrack.PFS <- DataTrack( gr.viz[gr.viz$outcome == "PFS", my.cohort], 
                                  name="PFS (-log10)", background.title=bgr.col[3]) 
         
-        dTrack.TRM <- DataTrack( gr.viz[gr.viz$outcome == "TRM", cohort], 
+        dTrack.TRM <- DataTrack( gr.viz[gr.viz$outcome == "TRM", my.cohort], 
                                  name="TRM (-log10)", background.title=bgr.col[4]) 
         
         
@@ -50,9 +50,9 @@ plotData <- function(gene, disease, genome, cohort, outcome){
         cohort.cols <- c('#66c2a5','#fc8d62','#8da0cb')
         
         
-        plotTracks(myTracks[c("itrack", "gtrack", "biomTrack", outcome)], 
+        plotTracks(myTracks[c("itrack", "gtrack", "biomTrack", my.outcome)], 
                    type=c( "p"), legend=T, cex=0.9, col.line = "gray", col= NULL,
-                   groups = cohort, col.symbol = cohort.cols,
+                   groups = my.cohort, col.symbol = cohort.cols,
                    transcriptAnnotation="symbol", stackHeight = 0.7, 
                    fontsize=16, collapseTranscripts = "meta",
                    baseline=c(0:8, -log10(5e-5), -log10(5e-8)),

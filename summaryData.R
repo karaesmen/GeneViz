@@ -20,3 +20,4 @@ summaryData <- function(my.gene, my.disease, my.genome, my.cohort, my.outcome, r
 }
 
 
+
