@@ -1,6 +1,7 @@
 OSU_PC <- "C:/Users/karaesmen.1/Box Sync/Sucheston-Campbell Lab/Candidate Gene/awesome/"
 OSU_VB <- "/media/sf_Sucheston-Campbell_Lab/Candidate Gene/awesome/"
-setwd(OSU_VB)
+ezgi_MB <- "~/Box Sync/Sucheston-Campbell Lab/Candidate Gene/awesome/"
+setwd(ezgi_MB)
 
 library(data.table)
 library(Gviz)
@@ -8,17 +9,14 @@ library(tidyverse)
 
 gene_loc <- read.table("./gene_locations.txt", stringsAsFactors = F, header = T)
 
-## genes to exclude for now ###
-genes2excl <- gene_loc[gene_loc$seqnames == "chr1", "gene_symbol"]
-
 
 ## data.table of FULL.table -- Candidate Gene (CG) data
 CG.data.raw <- fread("./FULL_table.txt",  header="auto", sep="auto")
 CG.data.raw[, c("Pvalue.log10") := -log10(CG.data.raw[,"Pvalue", with = F])]
 save(CG.data.raw, file="Full_table.RData")
 
-sig_SNPs = CG.data.raw[Pvalue.log10 > 7,]
-#sig_SNPs[!sig_SNPs$gene %in% genes2excl,]
+#sig_SNPs = CG.data.raw[Pvalue.log10 > 7,]
+
 
 CG.data <- dcast(CG.data.raw, gene + rsID + chr + BP + impute + disease + genome + outcome
             ~ cohort, value.var="Pvalue.log10")
@@ -29,9 +27,22 @@ CG.data = CG.data[order(gene, BP),]
 ## Generate the GRanges object
 CG.data <- as(CG.data, "data.frame")
 
-### exclude the wrong chr ###
-testt =CG.data[!c(CG.data$gene %in% genes2excl & !c(CG.data$chr == "chr1")), ]
+#############################
+### exclude the wrong chrs ###
 
+# genes to exclude for now 
+genes2excl <- gene_loc[gene_loc$seqnames == "chr1", "gene_symbol"]
+
+CG.data = CG.data[!c(CG.data$gene %in% genes2excl & !c(CG.data$chr == "chr1")), ]
+#############################
+
+#### explore CG.data####
+head(CG.data)
+
+cutoff = -log10(5e-5)
+CG.data[c(CG.data$M >= cutoff | CG.data$c1 >= cutoff | CG.data$c2 >= cutoff), ]
+
+## Prep CG.data for GRanges trans
 CG.data$end <- CG.data$BP+1
 CG.data$chr <- as.factor(CG.data$chr)
 
