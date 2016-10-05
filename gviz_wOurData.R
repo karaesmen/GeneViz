@@ -5,7 +5,7 @@ setwd(ezgi_MB)
 
 library(data.table)
 library(Gviz)
-library(tidyverse)
+library(manhattanly)
 
 gene_loc <- read.table("./gene_locations.txt", stringsAsFactors = F, header = T)
 
@@ -15,11 +15,33 @@ CG.data.raw <- fread("./FULL_table.txt",  header="auto", sep="auto")
 CG.data.raw[, c("Pvalue.log10") := -log10(CG.data.raw[,"Pvalue", with = F])]
 save(CG.data.raw, file="Full_table.RData")
 
-#sig_SNPs = CG.data.raw[Pvalue.log10 > 7,]
 
+##### Explore P-values ##### 
+sig_SNPs = CG.data.raw[Pvalue.log10 > 7,] 
+head(CG.data.raw[gene == "ABCB1",])
+nrow(CG.data.raw)
+anyNA(CG.data.raw)
+
+p[rsID == "rs9516551" & impute == "typed" & disease == "noALL" & genome == "R"  & outcome == "TRM" ,]
+
+test = CG.data.raw[gene == "ABCB1" & rsID == "rs28364280",]
+anyNA(test)
+test2 = dcast(test, gene + rsID + chr + BP + impute + disease + genome + outcome
+              ~ cohort, value.var="Pvalue.log10")
+anyNA(test2)
+nas = which(is.na(test2$M))
+test2[nas,]
+###########################
 
 CG.data <- dcast(CG.data.raw, gene + rsID + chr + BP + impute + disease + genome + outcome
             ~ cohort, value.var="Pvalue.log10")
+
+
+# anyNA(CG.data)
+# max(CG.data$c1)
+# nas=which(is.na(CG.data$c1))
+# CG.data[nas[1:10], ]
+
 
 #setorder(CG.data, gene, BP)
 CG.data = CG.data[order(gene, BP),]
@@ -38,19 +60,17 @@ CG.data = CG.data[!c(CG.data$gene %in% genes2excl & !c(CG.data$chr == "chr1")), 
 
 #### explore CG.data####
 head(CG.data)
+tail(CG.data)
 
 cutoff = -log10(5e-5)
-CG.data[c(CG.data$M >= cutoff | CG.data$c1 >= cutoff | CG.data$c2 >= cutoff), ]
+CG.data[M >= cutoff ,]#| CG.data$c1 >= cutoff | CG.data$c2 >= cutoff), ]
+head(CG.data[!is.na(CG.data),])
+
+table(CG.data$gene)
 
 ## Prep CG.data for GRanges trans
 CG.data$end <- CG.data$BP+1
 CG.data$chr <- as.factor(CG.data$chr)
-
-
-df <- data.frame(chr="chr1", start=11:15, end=12:16,
-                 strand=c("+","-","+","*","."), score=1:5)
-class(df$chr)
-
 
 gr <- makeGRangesFromDataFrame(CG.data, ignore.strand = T, start.field = "BP", end.field = "end", 
                                starts.in.df.are.0based = T, keep.extra.columns = T) # is it 0based??
