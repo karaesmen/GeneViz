@@ -1,7 +1,6 @@
 library(data.table)
 library(Gviz)
 
-
 plotData <- function(data, my.gene, my.disease, my.genome, my.cohort, my.outcome){
         my.cohort.col = c('#66c2a5','#fc8d62','#8da0cb')
         my.ylim.upper = 8

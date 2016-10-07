@@ -120,6 +120,7 @@ server <- function(input, output){
         })
         
         output$ui_plot <- renderUI({
+                input$plotbutton
                 isolate(plotOutput("gviz", height=plot_height(), width="100%"))
         })
         
