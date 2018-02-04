@@ -1,5 +1,3 @@
-library(TxDb.Hsapiens.UCSC.hg19.knownGene)
-library(org.Hs.eg.db)
 summary.res <- function(my.gene, my.disease, my.genome, my.cohort, my.outcome){
         header <- shiny::tags$h1(paste0("VEGAS2 gene-based results for ",  my.disease))#, " (", my.cohort, "/", my.outcome, ")"))
         gene.symbol <- paste0("Gene Symbol: ", my.gene)

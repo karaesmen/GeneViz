@@ -1,25 +1,15 @@
 library(shiny)
 library(data.table)
-
-# source("https://bioconductor.org/biocLite.R")
-# biocLite("Gviz")
 library(Gviz)
-# source("https://bioconductor.org/biocLite.R")
-# biocLite("TxDb.Hsapiens.UCSC.hg19.knownGene")
 library(TxDb.Hsapiens.UCSC.hg19.knownGene)
-
-
-# source("https://bioconductor.org/biocLite.R")
-# biocLite("org.Hs.eg.db")
-
 library(org.Hs.eg.db)
 library(plotly)
 library(manhattanly)
 
-setwd("~/Desktop/geneviz/")
 
 # read in full data table
-x <- fread("./data/FULL_table.txt",  header="auto", sep="auto")
+x <- readRDS("./data/FULL_table.rds")
+
 
 # append -log10(pvalue) column
 x[, c("Pvalue.log10") := -log10(x[,"Pvalue", with = F])]
@@ -29,12 +19,13 @@ x.dcast <- dcast(x, gene + rsID + chr + BP + impute + disease + genome + outcome
 
 # get unique list of genes
 setkey(x, gene)
-genes <- data.frame(unique(x)[,"gene",with=F])
+genes <- data.frame(unique(x[,"gene",with=F]))
 
 source("summaryres.R")
 source("plotData.R")
 source("vegas2Summary.R")
 source("manPlot.R")
+source("genedata.R")
 
 ui <- shinyUI(pageWithSidebar(
         headerPanel("DISCOVeRY-BMT Replication of Candidate Gene Studies"),
@@ -89,8 +80,25 @@ ui <- shinyUI(pageWithSidebar(
                                                      label="Select cohort:",
                                                      choices=c("c1", "c2", "M")),
                                  actionButton("manbutton", "Generate Manhattan Plot")
-                )
-        ),
+                ),
+                conditionalPanel(condition="input.conditionedPanels==4",
+                                 selectInput(inputId = "gene4",
+                                             label = "Select gene:",
+                                             choices=genes),
+                                 selectInput(inputId = "disease4",
+                                             label = "Select disease:",
+                                             choices=c("ALLonly", "AMLonly", "mixed", "noALL")),
+                                 selectInput(inputId = "genome4",
+                                             label = "Select genome:",
+                                             choices=c("D", "R", "S")),
+                                 checkboxGroupInput(inputId="outcome4",
+                                                    label="Select survival outcomes:",
+                                                    choices=c("DD", "PFS", "OS", "TRM")),
+                                 checkboxGroupInput(inputId="cohort4",
+                                                    label="Select cohort:",
+                                                    choices=c("c1", "c2", "M")),
+                                 actionButton("genebutton", "Generate Raw Summary"))
+                ),
         mainPanel(
                 tabsetPanel(
                         id = "conditionedPanels",
@@ -100,20 +108,25 @@ ui <- shinyUI(pageWithSidebar(
                         tabPanel("VEGAS2 Summary",
                                  htmlOutput("gene_info"),
                                  dataTableOutput("table"),
+                                 downloadButton('downloadvegas', 'Download'),
                                  value=2),
                         tabPanel("Manhattan Plot",
-                                 htmlOutput("man_info"),
+                                 plotlyOutput("manhattanly"),
                                  uiOutput("ui_man"),
-                                 value=3)
+                                 value=3),
+                        tabPanel("Gene Info",
+                                 dataTableOutput("gene_table"),
+                                 downloadButton("genedownload", 'Download'),
+                                 value=4)
                 )
         )
-))      
+))
 
 server <- function(input, output){
         plot_height <- function(){
                 ceiling((length(input$outcome)/2.5)*1000)
         }
-        
+
         output$gviz <- renderPlot({
                 input$plotbutton
                 isolate(plotData(x.dcast, input$gene, input$disease, input$genome, input$cohort, input$outcome))
@@ -131,25 +144,40 @@ server <- function(input, output){
         
         output$table <- renderDataTable({
                 input$summarybutton
-                isolate(vegas2Summary(input$gene2, input$disease2, input$genome2, c("c1", "c2", "M"), c("DD", "PFS", "OS", "TRM")))
+                isolate(vegas2Summary(x, input$gene2, input$disease2, input$genome2, c("c1", "c2", "M"), c("DD", "PFS", "OS", "TRM")))
         },
         options = list(bLengthChange=FALSE, sDom  = '<"top">lrt<"bottom">ip') #remove the entries dropdown box
         )
         
+        output$downloadvegas <- downloadHandler(
+                filename = function () { c(paste(input$gene2, input$disease2, input$genome2, sep ="-"), paste(".txt", sep=""))},
+                content = function(file){write.table(vegas2Summary(input$gene2, input$disease2, input$genome2, c("c1", "c2", "M"), c("DD", "PFS", "OS", "TRM")), file, quote=F, sep="\t")}
+        )
+
         output$manhattanly <- renderPlotly({
                 input$manbutton
                 isolate(manPlot(x, input$disease3, input$genome3, input$cohort3, input$outcome3))
         })
-        
+
         output$man_info <- renderUI({
                 input$manbutton
                 shiny::tags$h1(paste0("Interactive Manhattan Plot for ", input$disease3, " (", input$genome3, "/", input$cohort3, ")"))
         })
+
+        # output$ui_man <- renderUI({
+        #         input$manbutton
+        #         isolate(plotlyOutput("manhattanly"))
+        # })
         
-        output$ui_man <- renderUI({
-                input$manbutton
-                isolate(plotlyOutput("manhattanly"))
+        output$gene_table <- renderDataTable({
+                input$genebutton
+                isolate(genedata(x, input$gene4, input$disease4, input$genome4, input$cohort4, input$outcome4))
         })
+        
+        output$genedownload <- downloadHandler(
+                filename = function () { c(paste(input$gene4, input$disease4, input$genome4, "FULL", "GENE", sep ="-"), paste(".txt", sep=""))},
+                content = function(file){write.table(genedata(x, input$gene4, input$disease4, input$genome4, input$cohort4, input$outcome4), file, quote=F, sep="\t")}
+        )
         
 }
 
